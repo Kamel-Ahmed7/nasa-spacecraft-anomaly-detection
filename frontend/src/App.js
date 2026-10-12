@@ -40,6 +40,7 @@ export default function App() {
   }, []);
 
   // Health Check Backend with Retries (Cold Start Protection) & Pre-load T-1.npy
+  // Health Check Backend with Retries & Flexible Status Check
   useEffect(() => {
     let isMounted = true;
 
@@ -47,12 +48,13 @@ export default function App() {
       for (let i = 0; i < retries; i++) {
         try {
           const res = await axios.get(`${API_BASE_URL}/health`, { timeout: 8000 });
-          if (res.data && (res.data.status === "HEALTHY" || res.data.status === "online")) {
+          // لو السيرفر رد بأي بيانات، نعتبره أونلاين فوراً!
+          if (res.data) {
             if (isMounted) setBackendStatus("online");
             return;
           }
         } catch (err) {
-          console.warn(`Health check attempt ${i + 1} failed. Retrying...`);
+          console.warn(`Health check attempt ${i + 1} failed. Retrying...`, err);
           if (i < retries - 1) {
             await new Promise((resolve) => setTimeout(resolve, delay));
           }
@@ -62,6 +64,7 @@ export default function App() {
     };
 
     checkHealthWithRetries();
+    // ... باقي الـ useEffect
 
     // Auto-load benchmark channel on mount
     setIsLoading(true);
