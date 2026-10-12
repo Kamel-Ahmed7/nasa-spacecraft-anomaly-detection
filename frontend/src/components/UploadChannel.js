@@ -2,10 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Upload, FileCode, Play, AlertCircle, CheckCircle2 } from 'lucide-react';
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL 
-  ? `${process.env.REACT_APP_API_URL}/api` 
-  : 'http://localhost:8000/api';
+// في ملف UploadChannel.js
+const getCleanApiUrl = () => {
+  let url = process.env.REACT_APP_API_URL || "https://nasa-spacecraft-anomaly-detection-production.up.railway.app";
+  if (url.endsWith("/")) {
+    url = url.slice(0, -1);
+  }
+  return url;
+};
 
+const API_BASE_URL = `${getCleanApiUrl()}/api`;
 export default function UploadChannel({ onPredictionResult, isLoading, setIsLoading }) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);

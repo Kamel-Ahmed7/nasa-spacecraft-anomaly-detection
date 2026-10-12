@@ -14,13 +14,17 @@ import MetricsSummary from "./components/MetricsSummary";
 import TelemetryChart from "./components/TelemetryChart";
 
 // تنظيف الروابط أوتوماتيك وحماية من أي Trailing Slash
+// تعريف الرابط مباشرة بطريقة تضمن عدم فشله أبداً
 const getCleanApiUrl = () => {
-  let url = process.env.REACT_APP_API_URL || "http://localhost:8000";
+  // لو متغير البيئة موجود هياخده، لو مش موجود هيثبت رابط ريلواي فوراً
+  let url = process.env.REACT_APP_API_URL || "https://nasa-spacecraft-anomaly-detection-production.up.railway.app";
   if (url.endsWith("/")) {
     url = url.slice(0, -1);
   }
   return url;
 };
+
+const API_BASE_URL = `${getCleanApiUrl()}/api`;
 
 const API_BASE_URL = `${getCleanApiUrl()}/api`;
 
