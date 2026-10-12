@@ -13,9 +13,16 @@ import UploadChannel from "./components/UploadChannel";
 import MetricsSummary from "./components/MetricsSummary";
 import TelemetryChart from "./components/TelemetryChart";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL
-  ? `${process.env.REACT_APP_API_URL}/api`
-  : "http://localhost:8000/api";
+// تنظيف الروابط أوتوماتيك وحماية من أي Trailing Slash
+const getCleanApiUrl = () => {
+  let url = process.env.REACT_APP_API_URL || "http://localhost:8000";
+  if (url.endsWith("/")) {
+    url = url.slice(0, -1);
+  }
+  return url;
+};
+
+const API_BASE_URL = `${getCleanApiUrl()}/api`;
 
 export default function App() {
   const [predictionResults, setPredictionResults] = useState(null);
@@ -32,34 +39,47 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Health Check Backend on Load & Pre-load T-1.npy demo channel
+  // Health Check Backend with Retries (Cold Start Protection) & Pre-load T-1.npy
   useEffect(() => {
-    axios
-      .get(`${API_BASE_URL}/health`)
-      .then((res) => {
-        if (res.data && res.data.status === "HEALTHY") {
-          setBackendStatus("online");
-        } else {
-          setBackendStatus("warning");
+    let isMounted = true;
+
+    const checkHealthWithRetries = async (retries = 3, delay = 2000) => {
+      for (let i = 0; i < retries; i++) {
+        try {
+          const res = await axios.get(`${API_BASE_URL}/health`, { timeout: 8000 });
+          if (res.data && (res.data.status === "HEALTHY" || res.data.status === "online")) {
+            if (isMounted) setBackendStatus("online");
+            return;
+          }
+        } catch (err) {
+          console.warn(`Health check attempt ${i + 1} failed. Retrying...`);
+          if (i < retries - 1) {
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
         }
-      })
-      .catch(() => {
-        setBackendStatus("offline");
-      });
+      }
+      if (isMounted) setBackendStatus("offline");
+    };
+
+    checkHealthWithRetries();
 
     // Auto-load benchmark channel on mount
     setIsLoading(true);
     axios
       .post(`${API_BASE_URL}/sample/T-1.npy`)
       .then((res) => {
-        setPredictionResults(res.data);
+        if (isMounted) setPredictionResults(res.data);
       })
       .catch((err) => {
         console.warn("Could not pre-load sample channel T-1", err);
       })
       .finally(() => {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const exportReport = () => {
@@ -71,7 +91,7 @@ export default function App() {
     downloadAnchor.setAttribute("href", dataStr);
     downloadAnchor.setAttribute(
       "download",
-      `nasa_telemetry_anomaly_report_${predictionResults.filename || "channel"}.json`,
+      `nasa_telemetry_anomaly_report_${predictionResults.filename || "channel"}.json`
     );
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
@@ -126,7 +146,7 @@ export default function App() {
                   <span>BACKEND OFFLINE</span>
                 </span>
               ) : (
-                <span className="text-space-amber font-bold">
+                <span className="text-space-amber font-bold animate-pulse">
                   CHECKING STATUS...
                 </span>
               )}
@@ -231,7 +251,9 @@ export default function App() {
                             <div className="flex items-center space-x-2">
                               <div className="w-16 bg-space-dark rounded-full h-1.5 overflow-hidden border border-space-border">
                                 <div
-                                  className={`h-full ${isHighSeverity ? "bg-space-red" : "bg-space-amber"}`}
+                                  className={`h-full ${
+                                    isHighSeverity ? "bg-space-red" : "bg-space-amber"
+                                  }`}
                                   style={{ width: `${seq.confidence * 100}%` }}
                                 ></div>
                               </div>
