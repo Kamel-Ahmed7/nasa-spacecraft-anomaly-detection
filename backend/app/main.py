@@ -74,22 +74,7 @@ async def predict_file(file: UploadFile = File(...)):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Anomaly inference failed: {str(e)}")
-
-@app.get("/api/samples")
-def list_sample_channels():
-    """Returns available test channels from SMAP dataset directory."""
-    candidate_paths = [
-        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "archive", "data", "data", "test"),
-        r"D:\01- Development and Projects\Project_ML\Project_ML\archive\data\data\test"
-    ]
-    for path in candidate_paths:
-        if os.path.exists(path):
-            npy_files = sorted(glob.glob(os.path.join(path, "*.npy")))
-            return {"samples": [os.path.basename(f) for f in npy_files]}
-
-    # Fallback default known SMAP benchmark channels
-    return {"samples": ["T-1.npy", "P-1.npy", "A-1.npy", "S-1.npy", "E-1.npy", "E-2.npy", "E-3.npy", "D-1.npy"]}
-
+#============================================
 @app.post("/api/sample/{channel_name}")
 def predict_sample_channel(channel_name: str):
     """Executes prediction on an included SMAP benchmark channel."""
@@ -98,7 +83,37 @@ def predict_sample_channel(channel_name: str):
 
     candidate_paths = [
         os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "archive", "data", "data", "test", channel_name),
-        os.path.join(r"D:\01- Development and Projects\Project_ML\Project_ML\archive\data\data\test", channel_name)
+        os.path.join(os.getcwd(), "archive", "data", "data", "test", channel_name),
+        os.path.join(os.getcwd(), "data", "test", channel_name)
+    ]
+    sample_path = None
+    for cp in candidate_paths:
+        if os.path.exists(cp):
+            sample_path = cp
+            break
+
+    if sample_path is None or not os.path.exists(sample_path):
+        raise HTTPException(status_code=404, detail=f"Sample channel file '{channel_name}' not found.")
+
+    try:
+        raw_data = np.load(sample_path, allow_pickle=True)
+        predictor = get_predictor()
+        result = predictor.predict(raw_data, channel_name=channel_name)
+        result["filename"] = channel_name
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Inference failed on channel {channel_name}: {str(e)}")
+#============================================
+@app.post("/api/sample/{channel_name}")
+def predict_sample_channel(channel_name: str):
+    """Executes prediction on an included SMAP benchmark channel."""
+    if not channel_name.endswith(".npy"):
+        channel_name += ".npy"
+
+    candidate_paths = [
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "archive", "data", "data", "test", channel_name),
+        os.path.join(os.getcwd(), "archive", "data", "data", "test", channel_name),
+        os.path.join(os.getcwd(), "data", "test", channel_name)
     ]
     sample_path = None
     for cp in candidate_paths:
